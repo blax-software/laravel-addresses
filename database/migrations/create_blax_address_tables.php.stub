@@ -1,0 +1,211 @@
+<?php
+
+namespace Blax\Addresses\Migrations;
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * Creates two tables:
+     *  - `addresses`     – stores the physical address data (location, coordinates, etc.)
+     *  - `address_links` – polymorphic pivot linking addresses to any Eloquent model
+     */
+    public function up(): void
+    {
+        /*
+        |----------------------------------------------------------------------
+        | addresses — the canonical address record
+        |----------------------------------------------------------------------
+        |
+        | Designed to support worldwide formats, from a GPS point in the
+        | wilderness to a specific room inside a skyscraper.
+        |
+        | Coordinate system:
+        |   latitude / longitude  → WGS-84 decimal degrees
+        |   altitude              → metres Above Mean Sea Level (AMSL)
+        |
+        */
+        Schema::create(config('addresses.table_names.addresses', 'addresses'), function (Blueprint $table) {
+            $table->id();
+
+            // ── Street-level addressing ─────────────────────────────
+            // Primary street line (street name + house/building number).
+            $table->string('street')->nullable();
+
+            // Additional line for c/o, suite, apartment, P.O. box, etc.
+            $table->string('street_extra')->nullable();
+
+            // ── Building / indoor precision ─────────────────────────
+            // Building or complex name (e.g. "Empire State Building", "Block C").
+            $table->string('building')->nullable();
+
+            // Floor / level inside the building (string to allow "GF", "B2", "Mezzanine").
+            $table->string('floor')->nullable();
+
+            // Room, suite or unit number / name.
+            $table->string('room')->nullable();
+
+            // ── Postal / administrative divisions ───────────────────
+            // Postal / ZIP code.
+            $table->string('postal_code')->nullable();
+
+            // City, town, village or locality name.
+            $table->string('city')->nullable();
+
+            // State, province, canton, prefecture or equivalent.
+            $table->string('state')->nullable();
+
+            // County, district or other sub-state administrative area.
+            $table->string('county')->nullable();
+
+            // ISO 3166-1 alpha-2 country code (e.g. "AT", "US", "JP").
+            $table->string('country_code', 2)->nullable();
+
+            // ── Coordinates (WGS-84) ────────────────────────────────
+            // Latitude in decimal degrees (−90 to +90).
+            $table->decimal('latitude', 10, 7)->nullable();
+
+            // Longitude in decimal degrees (−180 to +180).
+            $table->decimal('longitude', 10, 7)->nullable();
+
+            // Altitude in metres above mean sea level (AMSL). Positive = above, negative = below.
+            $table->decimal('altitude', 10, 2)->nullable();
+
+            // ── Additional properties ───────────────────────────────
+            // Free-form notes (e.g. delivery instructions, landmark descriptions).
+            $table->text('notes')->nullable();
+
+            // Flexible JSON bucket for any extra data the consuming app needs
+            // (e.g. Plus Codes, what3words, timezone, formatted display string).
+            $table->json('meta')->nullable();
+
+            $table->timestamps();
+            $table->softDeletes();
+
+            // ── Indexes ─────────────────────────────────────────────
+            $table->index('country_code');
+            $table->index('postal_code');
+            $table->index('city');
+            $table->index(['latitude', 'longitude']);
+        });
+
+        /*
+        |----------------------------------------------------------------------
+        | address_links — polymorphic pivot ("addressable")
+        |----------------------------------------------------------------------
+        |
+        | Links an address to any Eloquent model (User, Company, Order …).
+        | The same address row can be linked to many models, and a single model
+        | can have many addresses (each with a different purpose / type).
+        |
+        | `type`        – enum value describing the purpose of this link
+        | `label`       – optional free-text override (handy for "Other" type)
+        | `is_primary`  – marks ONE link per type per model as the primary
+        | `active_from` – when this link becomes effective
+        | `active_until`– when this link expires / is superseded
+        | `meta`        – JSON bucket for developer-defined extra data
+        |
+        */
+        Schema::create(config('addresses.table_names.address_links', 'address_links'), function (Blueprint $table) {
+            $table->id();
+
+            // ── Foreign key to the address ──────────────────────────
+            $table->foreignId('address_id')
+                ->constrained(config('addresses.table_names.addresses', 'addresses'))
+                ->cascadeOnDelete();
+
+            // ── Polymorphic owner ───────────────────────────────────
+            // The model this address is linked to (e.g. App\Models\User, App\Models\Company).
+            $table->morphs('addressable');
+
+            // ── Link semantics ──────────────────────────────────────
+            // The purpose of this link, drawn from AddressLinkType enum.
+            $table->string('type')->default('other');
+
+            // Optional human-readable label to refine or override the type
+            // (useful when type = "other" or when several links share the same type).
+            $table->string('label')->nullable();
+
+            // Whether this is the primary address for this type on the model.
+            $table->boolean('is_primary')->default(false);
+
+            // ── Temporal validity ───────────────────────────────────
+            // When this link becomes active (null = immediately).
+            $table->timestamp('active_from')->nullable();
+
+            // When this link ceases to be active (null = indefinitely).
+            $table->timestamp('active_until')->nullable();
+
+            // ── Extra data ──────────────────────────────────────────
+            // JSON bucket for any developer-defined data on the pivot
+            // (e.g. delivery window, access codes, department reference).
+            $table->json('meta')->nullable();
+
+            $table->timestamps();
+
+            // ── Indexes ─────────────────────────────────────────────
+            $table->index(['addressable_type', 'addressable_id', 'type'], 'addr_link_owner_type');
+            $table->index('type');
+            $table->index('is_primary');
+        });
+    }
+
+        /*
+        |----------------------------------------------------------------------
+        | address_assignments — reference an AddressLink from another context
+        |----------------------------------------------------------------------
+        |
+        | While an AddressLink says "this Address belongs to User X as their
+        | Office", an AddressAssignment says "Job Y uses that specific link
+        | for its pickup location."
+        |
+        | `role`  – context-specific purpose (e.g. "pickup", "delivery", "origin")
+        | `label` – optional free-text label
+        | `meta`  – JSON bucket for developer-defined data
+        |
+        */
+        Schema::create(config('addresses.table_names.address_assignments', 'address_assignments'), function (Blueprint $table) {
+            $table->id();
+
+            // ── Foreign key to the address link ─────────────────────
+            $table->foreignId('address_link_id')
+                ->constrained(config('addresses.table_names.address_links', 'address_links'))
+                ->cascadeOnDelete();
+
+            // ── Polymorphic consumer ────────────────────────────────
+            // The model this address link is assigned to (e.g. Job, Order, Event).
+            $table->morphs('assignable');
+
+            // ── Assignment semantics ────────────────────────────────
+            // Context-specific role for this assignment (e.g. "pickup", "delivery").
+            $table->string('role')->nullable();
+
+            // Optional human-readable label.
+            $table->string('label')->nullable();
+
+            // ── Extra data ──────────────────────────────────────────
+            $table->json('meta')->nullable();
+
+            $table->timestamps();
+
+            // ── Indexes ─────────────────────────────────────────────
+            $table->index(['assignable_type', 'assignable_id', 'role'], 'addr_assign_owner_role');
+            $table->index('role');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists(config('addresses.table_names.address_assignments', 'address_assignments'));
+        Schema::dropIfExists(config('addresses.table_names.address_links', 'address_links'));
+        Schema::dropIfExists(config('addresses.table_names.addresses', 'addresses'));
+    }
+};
