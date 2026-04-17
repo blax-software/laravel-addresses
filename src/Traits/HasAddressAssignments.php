@@ -55,12 +55,12 @@ trait HasAddressAssignments
     /**
      * Assign an existing address link to this model.
      *
-     * @param  AddressLink|int  $addressLink  AddressLink model or ID
+     * @param  AddressLink|string  $addressLink  AddressLink model or ID
      * @param  string|null      $role         Context-specific role ("pickup", "delivery", …)
      * @param  array            $extra        Additional attributes (label, meta)
      * @return AddressAssignment
      */
-    public function assignAddressLink(AddressLink|int $addressLink, ?string $role = null, array $extra = []): AddressAssignment
+    public function assignAddressLink(AddressLink|string $addressLink, ?string $role = null, array $extra = []): AddressAssignment
     {
         $linkId = $addressLink instanceof AddressLink ? $addressLink->id : $addressLink;
 
@@ -82,10 +82,10 @@ trait HasAddressAssignments
     /**
      * Remove a specific address assignment by its ID.
      *
-     * @param  int  $assignmentId
+     * @param  int|string  $assignmentId
      * @return bool
      */
-    public function removeAddressAssignment(int $assignmentId): bool
+    public function removeAddressAssignment(int|string $assignmentId): bool
     {
         return (bool) $this->addressAssignments()->where('id', $assignmentId)->delete();
     }

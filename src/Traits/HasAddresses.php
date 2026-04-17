@@ -90,12 +90,12 @@ trait HasAddresses
     /**
      * Link an existing address to this model.
      *
-     * @param  Address|int                 $address  Address model or ID
+     * @param  Address|string              $address  Address model or ID
      * @param  AddressLinkType|string|null $type     Purpose of the link
      * @param  array                      $pivot    Extra pivot data
      * @return AddressLink                          The created link
      */
-    public function linkAddress(Address|int $address, AddressLinkType|string|null $type = null, array $pivot = []): AddressLink
+    public function linkAddress(Address|string $address, AddressLinkType|string|null $type = null, array $pivot = []): AddressLink
     {
         $addressId = $address instanceof Address ? $address->id : $address;
 
@@ -129,10 +129,10 @@ trait HasAddresses
      *
      * This only removes the link — the address itself is preserved.
      *
-     * @param  int  $linkId  The AddressLink ID
+     * @param  int|string  $linkId  The AddressLink ID
      * @return bool
      */
-    public function removeAddressLink(int $linkId): bool
+    public function removeAddressLink(int|string $linkId): bool
     {
         return (bool) $this->addressLinks()->where('id', $linkId)->delete();
     }
@@ -142,10 +142,10 @@ trait HasAddresses
      *
      * The address record itself is preserved.
      *
-     * @param  Address|int  $address  Address model or ID
+     * @param  Address|string  $address  Address model or ID
      * @return int  Number of links removed
      */
-    public function detachAddress(Address|int $address): int
+    public function detachAddress(Address|string $address): int
     {
         $addressId = $address instanceof Address ? $address->id : $address;
 
@@ -256,10 +256,10 @@ trait HasAddresses
     /**
      * Set an address link as the primary for its type, unsetting any previous primary.
      *
-     * @param  int  $linkId  The AddressLink ID to promote
+     * @param  int|string  $linkId  The AddressLink ID to promote
      * @return bool
      */
-    public function setPrimaryAddressLink(int $linkId): bool
+    public function setPrimaryAddressLink(int|string $linkId): bool
     {
         $linkModel = config('addresses.models.address_link', AddressLink::class);
 

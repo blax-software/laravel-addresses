@@ -4,6 +4,7 @@ namespace Blax\Addresses\Models;
 
 use Blax\Addresses\Enums\AddressLinkType;
 use Blax\Workkit\Traits\HasMeta;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -28,7 +29,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class AddressLink extends Model
 {
-    use HasMeta;
+    use HasMeta, HasUuids;
 
     /**
      * Mass-assignable attributes.

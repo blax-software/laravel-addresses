@@ -3,6 +3,7 @@
 namespace Blax\Addresses\Models;
 
 use Blax\Workkit\Traits\HasMeta;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -38,6 +39,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Address extends Model
 {
     use HasMeta;
+    use HasUuids;
     use SoftDeletes;
 
     /**

@@ -23,7 +23,8 @@
     ],
     "autoload": {
         "psr-4": {
-            "Blax\\Addresses\\": "src"
+            "Blax\\Addresses\\": "src",
+            "Blax\\Addresses\\Seeders\\": "database/seeders"
         },
         "files": [
             "src/helpers.php"
