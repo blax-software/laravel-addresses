@@ -25,6 +25,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property int                        $assignable_id    – Morph ID of the consuming model
  * @property string|null                $role             – Context-specific purpose ("pickup", "delivery", …)
  * @property string|null                $label            – Free-text label
+ * @property string|null                $name_on_door     – Name on door / bell / intercom
+ * @property string|null                $email            – Contact email for this assignment
+ * @property string|null                $phone            – Contact phone for this assignment
+ * @property string|null                $floor            – Floor override for this assignment
+ * @property string|null                $door             – Door / apartment / unit override
  * @property object|null                $meta             – Arbitrary JSON data
  * @property \Carbon\Carbon             $created_at
  * @property \Carbon\Carbon             $updated_at
@@ -42,6 +47,11 @@ class AddressAssignment extends Model
         'assignable_id',
         'role',
         'label',
+        'name_on_door',
+        'email',
+        'phone',
+        'floor',
+        'door',
         'meta',
     ];
 
@@ -112,6 +122,28 @@ class AddressAssignment extends Model
     public function assignable()
     {
         return $this->morphTo();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accessors — effective values (assignment overrides base address)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * The effective floor: assignment's floor if set, otherwise the base address's floor.
+     */
+    public function getEffectiveFloorAttribute(): ?string
+    {
+        return $this->floor ?? $this->addressLink?->address?->floor;
+    }
+
+    /**
+     * The effective door/room: assignment's door if set, otherwise the base address's room.
+     */
+    public function getEffectiveDoorAttribute(): ?string
+    {
+        return $this->door ?? $this->addressLink?->address?->room;
     }
 
     /*

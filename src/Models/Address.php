@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property float|null  $latitude     – Decimal degrees (−90 … +90)
  * @property float|null  $longitude    – Decimal degrees (−180 … +180)
  * @property float|null  $altitude     – Metres AMSL (positive = above, negative = below)
+ * @property bool        $has_elevator – Whether the building has an elevator
  * @property string|null $notes        – Free-form notes / delivery instructions
  * @property object|null $meta         – Arbitrary JSON data
  * @property \Carbon\Carbon $created_at
@@ -60,6 +61,7 @@ class Address extends Model
         'latitude',
         'longitude',
         'altitude',
+        'has_elevator',
         'notes',
         'meta',
     ];
@@ -70,8 +72,9 @@ class Address extends Model
     protected $casts = [
         'latitude'  => 'float',
         'longitude' => 'float',
-        'altitude'  => 'float',
-        'meta'      => 'object',
+        'altitude'      => 'float',
+        'has_elevator'  => 'boolean',
+        'meta'          => 'object',
     ];
 
     /*

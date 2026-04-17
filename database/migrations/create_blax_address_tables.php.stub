@@ -76,6 +76,10 @@ return new class extends Migration
             // Altitude in metres above mean sea level (AMSL). Positive = above, negative = below.
             $table->decimal('altitude', 10, 2)->nullable();
 
+            // ── Building amenities ───────────────────────────────────
+            // Whether the building has an elevator (relevant for moving, deliveries).
+            $table->boolean('has_elevator')->default(false);
+
             // ── Additional properties ───────────────────────────────
             // Free-form notes (e.g. delivery instructions, landmark descriptions).
             $table->text('notes')->nullable();
@@ -186,6 +190,28 @@ return new class extends Migration
 
             // Optional human-readable label.
             $table->string('label')->nullable();
+
+            // ── Contact / access overrides ──────────────────────────
+            // These let the assignment specify WHO to contact and WHERE
+            // exactly within the building, independent of the base address.
+            // The address stays generic ("Main Street 5, 1010 Vienna")
+            // while the assignment adds context ("3rd floor, door 12, ring Müller").
+
+            // Name on the door / bell / intercom.
+            $table->string('name_on_door')->nullable();
+
+            // Contact email for this specific assignment.
+            $table->string('email')->nullable();
+
+            // Contact phone for this specific assignment.
+            $table->string('phone')->nullable();
+
+            // Floor override (when the base address doesn't specify one,
+            // or this assignment targets a different floor).
+            $table->string('floor')->nullable();
+
+            // Door / apartment / unit number override.
+            $table->string('door')->nullable();
 
             // ── Extra data ──────────────────────────────────────────
             $table->json('meta')->nullable();
