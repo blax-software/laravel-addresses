@@ -27,12 +27,23 @@ class AddressesServiceProvider extends ServiceProvider
     /**
      * Bootstrap the application events.
      *
-     * Publishes config and migration stubs, and registers model bindings
-     * so that the container always resolves the (possibly overridden) model.
+     * Publishes config and migration stubs, registers model bindings so
+     * that the container always resolves the (possibly overridden) model,
+     * and auto-loads any *additive* migrations the package ships in
+     * `database/migrations/` (plain .php files — the create-tables
+     * baseline stays a `.stub` for vendor:publish only).
      */
     public function boot(): void
     {
         $this->offerPublishing();
+
+        // Auto-load additive migrations (e.g. new columns / indexes) shipped
+        // with the package as plain `.php` files. The original `create_…`
+        // migration is a `.stub` and is therefore NOT picked up here —
+        // consumers must still `vendor:publish` it once to set the baseline
+        // (preserves backwards-compatibility with apps that already published
+        // a customised version, like UUID PKs).
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
         $this->registerModelBindings();
     }
