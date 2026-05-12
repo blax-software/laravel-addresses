@@ -32,6 +32,11 @@ class HasAddressesTest extends TestCase
             'prefix' => '',
             'foreign_key_constraints' => true,
         ]);
+
+        // Geocoding hits a live HTTP API (Nominatim) and is paced by a
+        // 1-req/sec cache lock — both of which would make the legacy
+        // suite hang. Geocoding has its own test file with Http::fake().
+        $app['config']->set('addresses.geocoding.enabled', false);
     }
 
     protected function defineDatabaseMigrations(): void

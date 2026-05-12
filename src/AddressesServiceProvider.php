@@ -2,7 +2,17 @@
 
 namespace Blax\Addresses;
 
+use Blax\Addresses\Models\Address;
+use Blax\Addresses\Models\AddressAssignment;
+use Blax\Addresses\Models\AddressLink;
+use Blax\Addresses\Observers\AddressObserver;
 use Blax\Addresses\Services\AddressService;
+use Blax\Addresses\Services\Geocoding\Contracts\Geocoder;
+use Blax\Addresses\Services\Geocoding\NominatimGeocoder;
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Support\Collection;
 use Illuminate\Support\ServiceProvider;
 
 class AddressesServiceProvider extends ServiceProvider
@@ -16,12 +26,24 @@ class AddressesServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/addresses.php',
+            __DIR__.'/../config/addresses.php',
             'addresses'
         );
 
         // Register AddressService as a singleton.
         $this->app->singleton(AddressService::class);
+
+        // Default Geocoder binding. Apps can rebind this contract to a
+        // different driver (Mapbox, Google, …) in their own provider —
+        // the AddressObserver only knows about the contract, not the
+        // concrete implementation.
+        $this->app->singleton(Geocoder::class, function ($app) {
+            return new NominatimGeocoder(
+                $app->make(HttpFactory::class),
+                $app->make(CacheFactory::class),
+                $app['config']->get('addresses.geocoding', []),
+            );
+        });
     }
 
     /**
@@ -43,9 +65,31 @@ class AddressesServiceProvider extends ServiceProvider
         // consumers must still `vendor:publish` it once to set the baseline
         // (preserves backwards-compatibility with apps that already published
         // a customised version, like UUID PKs).
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         $this->registerModelBindings();
+
+        $this->registerModelObservers();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Observers
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Attach the AddressObserver to the (possibly overridden) Address
+     * model so saving an address triggers the geocoding pipeline.
+     *
+     * Resolves the concrete Address class through config so a consumer
+     * extending the model still gets observed.
+     */
+    protected function registerModelObservers(): void
+    {
+        $addressModel = $this->app['config']->get('addresses.models.address', Address::class);
+
+        $addressModel::observe(AddressObserver::class);
     }
 
     /*
@@ -65,12 +109,12 @@ class AddressesServiceProvider extends ServiceProvider
 
         // Config
         $this->publishes([
-            __DIR__ . '/../config/addresses.php' => $this->app->configPath('addresses.php'),
+            __DIR__.'/../config/addresses.php' => $this->app->configPath('addresses.php'),
         ], 'addresses-config');
 
         // Migrations
         $this->publishes([
-            __DIR__ . '/../database/migrations/create_blax_address_tables.php.stub' => $this->getMigrationFileName('create_blax_address_tables.php'),
+            __DIR__.'/../database/migrations/create_blax_address_tables.php.stub' => $this->getMigrationFileName('create_blax_address_tables.php'),
         ], 'addresses-migrations');
     }
 
@@ -82,13 +126,13 @@ class AddressesServiceProvider extends ServiceProvider
     {
         $timestamp = date('Y_m_d_His');
 
-        $filesystem = $this->app->make(\Illuminate\Filesystem\Filesystem::class);
+        $filesystem = $this->app->make(Filesystem::class);
 
-        return \Illuminate\Support\Collection::make([
-            $this->app->databasePath() . DIRECTORY_SEPARATOR . 'migrations' . DIRECTORY_SEPARATOR,
+        return Collection::make([
+            $this->app->databasePath().DIRECTORY_SEPARATOR.'migrations'.DIRECTORY_SEPARATOR,
         ])
-            ->flatMap(fn($path) => $filesystem->glob($path . '*_' . $migrationFileName))
-            ->push($this->app->databasePath() . "/migrations/{$timestamp}_{$migrationFileName}")
+            ->flatMap(fn ($path) => $filesystem->glob($path.'*_'.$migrationFileName))
+            ->push($this->app->databasePath()."/migrations/{$timestamp}_{$migrationFileName}")
             ->first();
     }
 
@@ -105,18 +149,18 @@ class AddressesServiceProvider extends ServiceProvider
     protected function registerModelBindings(): void
     {
         $this->app->bind(
-            \Blax\Addresses\Models\Address::class,
-            fn($app) => $app->make($app->config['addresses.models.address'])
+            Address::class,
+            fn ($app) => $app->make($app->config['addresses.models.address'])
         );
 
         $this->app->bind(
-            \Blax\Addresses\Models\AddressLink::class,
-            fn($app) => $app->make($app->config['addresses.models.address_link'])
+            AddressLink::class,
+            fn ($app) => $app->make($app->config['addresses.models.address_link'])
         );
 
         $this->app->bind(
-            \Blax\Addresses\Models\AddressAssignment::class,
-            fn($app) => $app->make($app->config['addresses.models.address_assignment'])
+            AddressAssignment::class,
+            fn ($app) => $app->make($app->config['addresses.models.address_assignment'])
         );
     }
 }

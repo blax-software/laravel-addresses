@@ -31,7 +31,12 @@ return new class extends Migration
         |
         */
         Schema::create(config('addresses.table_names.addresses', 'addresses'), function (Blueprint $table) {
-            $table->id();
+            // UUID PK — the Address model uses `HasUuids`. If you've already
+            // published a previous version of this stub with `$table->id()`
+            // (auto-increment), keep that — but you'll need to either drop
+            // `HasUuids` from your Address override or migrate the column to
+            // a UUID. Don't change a populated table's PK shape blindly.
+            $table->uuid('id')->primary();
 
             // ── Street-level addressing ─────────────────────────────
             // Primary street line (street name + house/building number).
@@ -116,10 +121,10 @@ return new class extends Migration
         |
         */
         Schema::create(config('addresses.table_names.address_links', 'address_links'), function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
 
             // ── Foreign key to the address ──────────────────────────
-            $table->foreignId('address_id')
+            $table->foreignUuid('address_id')
                 ->constrained(config('addresses.table_names.addresses', 'addresses'))
                 ->cascadeOnDelete();
 
@@ -173,10 +178,10 @@ return new class extends Migration
         |
         */
         Schema::create(config('addresses.table_names.address_assignments', 'address_assignments'), function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
 
             // ── Foreign key to the address link ─────────────────────
-            $table->foreignId('address_link_id')
+            $table->foreignUuid('address_link_id')
                 ->constrained(config('addresses.table_names.address_links', 'address_links'))
                 ->cascadeOnDelete();
 

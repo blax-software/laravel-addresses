@@ -27,6 +27,7 @@ Address            →  The physical place (street, city, coordinates …)
 - **Address assignments** — reference someone else's address in another context
 - **Temporal validity** — `active_from` / `active_until` on every link
 - **AddressService** — distance calculations (Haversine), proximity queries, duplicate detection, coordinate conversion
+- **Auto-geocoding** — saves call Nominatim (OpenStreetMap) for lat/lon, serialized by a Cache lock and paced at 1 req/sec
 - **Fully configurable** — custom model classes, table names, default link type
 - **Soft deletes** on addresses, cascade deletes on links and assignments
 
@@ -107,7 +108,57 @@ $job->assignAddressLink($link, 'pickup');
 $job->assignedAddressForRole('pickup'); // → the Address model
 ```
 
-### 5. Use the AddressService
+### 5. Automatic geocoding (opt-in)
+
+Set `ADDRESSES_GEOCODING_ENABLED=true` to have an observer ask Nominatim
+(OpenStreetMap) for `latitude` / `longitude` after every save. Calls are
+serialized cluster-wide through a `Cache::lock` and paced at 1 req/sec
+to honour the OSMF usage policy. **Off by default** so an upgrade
+doesn't surprise existing apps with new outbound HTTP traffic.
+
+```ini
+# .env
+ADDRESSES_GEOCODING_ENABLED=true
+# OSMF policy: identify your app — generic UAs get blocked.
+ADDRESSES_GEOCODING_USER_AGENT="my-app (https://example.com)"
+ADDRESSES_GEOCODING_EMAIL="ops@example.com"
+```
+
+```php
+$address = Address::create([
+    'street'       => 'Stephansplatz 1',
+    'postal_code'  => '1010',
+    'city'         => 'Vienna',
+    'country_code' => 'AT',
+]);
+
+// Observer has filled these in by the time create() returns.
+$address->refresh();
+$address->latitude;   // 48.2082…
+$address->longitude;  // 16.3738…
+```
+
+Tunable knobs (see [`config/addresses.php`](config/addresses.php) →
+`geocoding`):
+
+- `enabled` — master switch (env: `ADDRESSES_GEOCODING_ENABLED`)
+- `driver` — only `nominatim` ships out of the box, but you can rebind
+  the `Geocoder` contract to plug in Google Maps / Mapbox / Mapquest /
+  a self-hosted Nominatim
+- `update_only_when_missing` — leave manually-entered coordinates alone
+- `min_interval_seconds` — global ceiling on outbound traffic (default
+  `1.0`, matches Nominatim's published policy)
+- `lock_wait_seconds`, `lock_ttl_seconds` — Cache lock parameters
+- `accept_language` — Nominatim's `display_name` localization
+- `drivers.nominatim.user_agent` / `email` — required by Nominatim for
+  attribution; set both in production
+
+For tests / imports, disable per-environment with
+`ADDRESSES_GEOCODING_ENABLED=false` (or
+`config()->set('addresses.geocoding.enabled', false)` inside a TestCase
+hook).
+
+### 6. Use the AddressService
 
 ```php
 // Via helper
@@ -129,6 +180,7 @@ echo address()->formatMultiline($address);
 | [HasAddresses Trait](docs/has-addresses.md)                    | Full API for address-owning models                   |
 | [HasAddressAssignments Trait](docs/has-address-assignments.md) | Full API for address-consuming models                |
 | [AddressService](docs/address-service.md)                      | Distance, proximity, formatting, conversion          |
+| [Geocoding](docs/geocoding.md)                                 | Auto lat/lon via Nominatim, cache lock, rate limit   |
 | [AddressLinkType Enum](docs/address-link-types.md)             | All 17 built-in types with descriptions              |
 | [Customization](docs/customization.md)                         | Extending models, custom tables, overriding defaults |
 
